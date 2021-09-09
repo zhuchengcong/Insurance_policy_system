@@ -414,6 +414,8 @@ class SettlementsViewset(ModelViewSet):
                 fee_str = row_data['fee'].split(',')
                 print(row_data, fee_str)
 
+                shangyefee = None
+                jiaoqiangfee = None
                 # + nature_of_use 全部字段是否相等，提取对应费率
                 for item in fee_str:
                     if '商业险' + nature_of_use in item.split('-')[0]:
@@ -422,6 +424,8 @@ class SettlementsViewset(ModelViewSet):
                         jiaoqiangfee = Decimal(item.split('-')[1])
 
                 if shangyefee is not None:
+                    if row_data['commercial_insurance_amount'] is None:
+                        row_data['commercial_insurance_amount'] = 0
                     row_data['commercial_insurance_amount_fee'] = row_data[
                                                                       'commercial_insurance_amount'] * shangyefee / 100
 
@@ -430,6 +434,8 @@ class SettlementsViewset(ModelViewSet):
                     row_data['commercial_insurance_amount_fee'] = '暂无匹配费率'
 
                 if jiaoqiangfee is not None:
+                    if row_data['jiaoqiang_insurance_amount'] is None:
+                        row_data['jiaoqiang_insurance_amount'] = 0
                     row_data['jiaoqiang_insurance_amount_fee'] = row_data[
                                                                      'jiaoqiang_insurance_amount'] * jiaoqiangfee / 100
                     row_data['jiaoqiang_fee'] = jiaoqiangfee
