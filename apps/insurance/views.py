@@ -28,7 +28,7 @@ from utils.AliMsg import create_code, SendSmsObject
 from utils.jwtAuth import JWTAuthentication
 from utils.pagination import Pagination
 from utils.permissions import JWTAuthPermission, AllowAllPermission, BaseAuthPermission
-from .filters import InsurancePolicyDateFilterBackend
+from .filters import InsurancePolicyDateFilterBackend, DoctorsFilter
 from .models import *
 from .serializers import *
 from functools import reduce
@@ -36,6 +36,44 @@ from urllib.parse import unquote_plus
 from django.conf import settings
 from utils.db_util import dictfetchall
 
+
+def match_insurance_chanel():
+    sql = '''select a.*, a.id as insuranceid,b.channel_name,c.id as channelid from insurance_policy a 
+    join channel_match b on a.applicant = b.applicant and b.insured = a.insured and b.vehicel_owner = a.vehicel_owner
+    left join channel_rate c on c.chanel = b.channel_name
+    where a.chanel_rate_id_id is null
+    '''
+    cur = connection.cursor()
+    cur.execute(sql)
+    data = dictfetchall(cur)
+
+    succ_count = 0
+
+    for i in data:
+        if i['channelid'] is not None:
+            insurance = InsurancePolicy.objects.get(id=i['insuranceid'])
+            insurance.chanel_rate_id = ChannelRate.objects.get(id=i['channelid'])
+            insurance.save()
+            i['matched'] = '成功匹配' + i['channel_name'] + '渠道'
+            succ_count = succ_count + 1
+        else:
+            channels = ChannelRate.objects.filter(chanel=i['channel_name'])
+            if len(channels) == 0:
+                channel = ChannelRate.objects.create(chanel=i['channel_name'])
+                insurance = InsurancePolicy.objects.get(id=i['insuranceid'])
+                insurance.chanel_rate_id = channel
+                insurance.save()
+                i['matched'] = '匹配成功，系统新创建' + i['channel_name'] + '渠道'
+                succ_count = succ_count + 1
+            else:
+                insurance = InsurancePolicy.objects.get(id=i['insuranceid'])
+                insurance.chanel_rate_id = channels[0]
+                insurance.save()
+                i['matched'] = '成功匹配' + i['channel_name'] + '渠道'
+                succ_count = succ_count + 1
+
+    data = {'message': 'ok', 'errorCode': 0, 'succ_count': succ_count, 'data': data}
+    return data
 
 # 传入的 headers column 均为 pandas.Series对象
 def get_model_from_json(model_instance, headers, column):
@@ -227,7 +265,7 @@ class InsurancePolicyViewset(ModelViewSet):
     permission_classes = [BaseAuthPermission, ]
     throttle_classes = [VisitThrottle]
     serializer_class = InsurancePolicySerializer
-    filter_backends = (DjangoFilterBackend, SearchFilter, OrderingFilter, InsurancePolicyDateFilterBackend)
+    filter_backends = (DjangoFilterBackend, SearchFilter, OrderingFilter, ) # InsurancePolicyDateFilterBackend
     search_fields = ('$jiaoqiang_insure_no', '$nature_of_use', '$chanel_rate_id__chanel', '$settlement_status',
                      '$business_source', '$salesman')
     filter_fields = ('jiaoqiang_insure_no', 'nature_of_use', 'chanel_rate_id__chanel', 'settlement_status',
@@ -300,6 +338,7 @@ class InsurancePolicyViewset(ModelViewSet):
                 insurance_policy.save()
                 id_arr.append(insurance_policy.pk)
 
+        match_insurance_chanel()
         queryset = InsurancePolicy.objects.filter(id__in=id_arr)
         serializer = InsurancePolicySerializer(queryset, many=True)
         return Response(serializer.data)
@@ -497,26 +536,7 @@ class ChannelMatchViewset(ModelViewSet):
 
     # 按照规则 匹配 所有 未匹配渠道的 保单
     @action(methods=['get'], detail=False, permission_classes=[AllowAllPermission])
+    @transaction.atomic()
     def match_insurance(self, request):
-        sql = '''select a.*, a.id as insuranceid,b.channel_name,c.id as channelid from insurance_policy a 
-join channel_match b on a.applicant = b.applicant and b.insured = a.insured and b.vehicel_owner = a.vehicel_owner
-left join channel_rate c on c.chanel = b.channel_name
-where a.chanel_rate_id_id is null
-'''
-        cur = connection.cursor()
-        cur.execute(sql)
-        data = dictfetchall(cur)
-
-        succ_count = 0
-
-        for i in data:
-            if i['channelid'] is not None:
-                insurance = InsurancePolicy.objects.get(id=i['insuranceid'])
-                insurance.chanel_rate_id = ChannelRate.objects.get(id=i['channelid'])
-                insurance.save()
-                i['matched'] = '匹配成功'
-                succ_count = succ_count + 1
-            else:
-                i['matched'] = '匹配失败，系统没有录入' + i['channel_name'] + '渠道'
-        data = {'message': 'ok', 'errorCode': 0, 'succ_count': succ_count, 'data': data}
+        data = match_insurance_chanel()
         return Response(data)

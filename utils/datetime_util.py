@@ -39,3 +39,9 @@ def get_dateitem_from_str(datetime_str):
 # 不带时区时间 转换
 def get_date(datetime_str):
     timezone.datetime.strptime(datetime_str, '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=None)
+
+
+# 返回当前时间 +1天 的时间字符串
+def date_add_day(day):
+    date = datetime.datetime.now() + datetime.timedelta(days=day)
+    return time.strftime('%Y-%m-%d %H:%M:%S', date)

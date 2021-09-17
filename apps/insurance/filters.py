@@ -1,3 +1,4 @@
+from django_filters import rest_framework
 from rest_framework.filters import BaseFilterBackend
 from rest_framework.compat import coreapi, coreschema, distinct
 
@@ -13,11 +14,30 @@ class InsurancePolicyDateFilterBackend(BaseFilterBackend):
         # print(request.query_params.get('endTime'))
         startTime = '2000-01-01 00:00:00'
         endTime = '2099-01-01 00:00:00'
+
+        InsruanceStartDate = '2000-01-01 00:00:00'
+        InsruanceEndDate = '2099-01-01 00:00:00'
+
         if request.query_params.get('startTime') is not None:
             startTime = request.query_params.get('startTime')
         if request.query_params.get('endTime') is not None:
             endTime = request.query_params.get('endTime')
-        return queryset.filter(deleted=None, generation_date__gte=startTime, generation_date__lte=endTime)
+
+        if request.query_params.get('InsruanceStartDate') is not None:
+            InsruanceStartDate = request.query_params.get('InsruanceStartDate')
+        if request.query_params.get('InsruanceEndDate') is not None:
+            InsruanceEndDate = request.query_params.get('InsruanceEndDate')
+
+        # print(startTime)
+        # print(endTime)
+        # print(InsruanceStartDate)
+        # print(InsruanceEndDate)
+        return queryset.filter(deleted=None, generation_date__gte=startTime, generation_date__lte=endTime,
+                               jiaoqiang_insurance_start_date__gte=InsruanceStartDate,
+                               jiaoqiang_insurance_start_date__lte=InsruanceEndDate,
+                               commercial_insurance_start_date__gte=InsruanceStartDate,
+                               commercial_insurance_start_date__lte=InsruanceEndDate
+                               )
 
     def get_schema_fields(self, view):
         assert coreapi is not None, 'coreapi must be installed to use `get_schema_fields()`'
@@ -39,6 +59,24 @@ class InsurancePolicyDateFilterBackend(BaseFilterBackend):
                 schema=coreschema.String(
                     title='force_str(self.search_title)',
                     description='结束时间'
+                )
+            ),
+            coreapi.Field(
+                name='InsruanceStartDate',
+                required=False,
+                location='query',
+                schema=coreschema.String(
+                    title='force_str(self.search_title)',
+                    description='起保时间'
+                )
+            ),
+            coreapi.Field(
+                name='InsruanceEndDate',
+                required=False,
+                location='query',
+                schema=coreschema.String(
+                    title='force_str(self.search_title)',
+                    description='结保时间'
                 )
             )
         ]
@@ -62,5 +100,33 @@ class InsurancePolicyDateFilterBackend(BaseFilterBackend):
                 'schema': {
                     'type': 'string',
                 },
+            },
+            {
+                'name': 'InsruanceStartDate',
+                'required': False,
+                'in': 'query',
+                'description': '起保时间',
+                'schema': {
+                    'type': 'string',
+                },
+            },
+            {
+                'name': 'InsruanceEndDate',
+                'required': False,
+                'in': 'query',
+                'description': '结保时间',
+                'schema': {
+                    'type': 'string',
+                },
             }
         ]
+
+
+class DoctorsFilter(rest_framework.FilterSet):
+    # 交强险 起保 日期范围
+    JiaoQiangDate = rest_framework.DateFromToRangeFilter(field_name='jiaoqiang_insurance_start_date',
+                                                         lookup_expr='gte', label='交强险起保日期范围')
+
+    # 商业险 起保 日期范围
+    CommercialDate = rest_framework.DateFromToRangeFilter(field_name='commercial_insurance_start_date',
+                                                          lookup_expr='gte', label='商业险起保日期范围')
