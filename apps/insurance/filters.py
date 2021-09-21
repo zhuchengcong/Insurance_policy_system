@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django_filters import rest_framework
 from rest_framework.filters import BaseFilterBackend
 from rest_framework.compat import coreapi, coreschema, distinct
@@ -34,11 +35,17 @@ class InsurancePolicyDateFilterBackend(BaseFilterBackend):
         # print(InsruanceEndDate)
         if request.query_params.get('InsruanceStartDate') is not None and request.query_params.get(
                 'InsruanceEndDate') is not None:
-            return queryset.filter(deleted=None, generation_date__gte=startTime, generation_date__lte=endTime,
-                                   jiaoqiang_insurance_start_date__gte=InsruanceStartDate,
-                                   jiaoqiang_insurance_start_date__lte=InsruanceEndDate,
-                                   commercial_insurance_start_date__gte=InsruanceStartDate,
-                                   commercial_insurance_start_date__lte=InsruanceEndDate,
+            return queryset.filter(Q(
+                Q(deleted=None, generation_date__gte=startTime, generation_date__lte=endTime,
+                  jiaoqiang_insurance_start_date__gte=InsruanceStartDate,
+                  jiaoqiang_insurance_start_date__lte=InsruanceEndDate,
+                  ) | Q(commercial_insurance_start_date=None)
+            ) |
+                                   Q(
+                                       Q(
+                                           commercial_insurance_start_date__gte=InsruanceStartDate,
+                                           commercial_insurance_start_date__lte=InsruanceEndDate)
+                                   ) | Q(jiaoqiang_insurance_start_date=None)
                                    )
         else:
             return queryset.filter(deleted=None, generation_date__gte=startTime, generation_date__lte=endTime, )
