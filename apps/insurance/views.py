@@ -1,9 +1,11 @@
 import traceback
 import uuid, os, sys, requests, json, re, time, datetime, random, hashlib, hmac, base64, xml, subprocess, threading
+from copy import deepcopy
 from decimal import Decimal
 
 from django.db import connection, transaction
 from django.db.models import F, Q
+from django.http import JsonResponse
 from django.utils.timezone import make_aware
 from rest_framework import serializers, status, generics, mixins, viewsets
 from rest_framework.decorators import action
@@ -37,6 +39,7 @@ from django.conf import settings
 from utils.db_util import dictfetchall
 
 
+# 根据渠道匹配规则 匹配渠道
 def match_insurance_chanel():
     sql = '''select a.*, a.id as insuranceid,b.channel_name,c.id as channelid from insurance_policy a 
     join channel_match b on a.applicant = b.applicant and b.insured = a.insured and b.vehicel_owner = a.vehicel_owner
@@ -75,9 +78,11 @@ def match_insurance_chanel():
     data = {'message': 'ok', 'errorCode': 0, 'succ_count': succ_count, 'data': data}
     return data
 
+
 # 传入的 headers column 均为 pandas.Series对象
 def get_model_from_json(model_instance, headers, column):
     row_index = list(headers.index)
+    # print('row_index', row_index)
     arr_fields = model_instance._meta.fields
     for i in arr_fields:
         try:
@@ -85,7 +90,9 @@ def get_model_from_json(model_instance, headers, column):
             # print(i.name, json_info[i.name])
 
             # 复制 row_index  index相当于索引   headers, column 是一个 pandas.Series 对象
+
             for index in row_index:
+                # print('headers[index]', headers[index])
                 if i.verbose_name in headers[index]:
 
                     # 去掉 空值
@@ -96,6 +103,7 @@ def get_model_from_json(model_instance, headers, column):
                     # 去掉一个匹配的属性，避免重复对比
                     headers.drop(index)
         except KeyError as e:
+            traceback.print_exc()
             pass
             # if e.__str__() == '\'id\'':
             #     # 新增时没有id
@@ -206,36 +214,6 @@ class ChannelEffectiveTimeViewset(ModelViewSet):
             return Response(data)
 
 
-# class ChannelRateOneViewset(ModelViewSet):
-#     '''
-#     管理渠道费率1
-#     '''
-#     queryset = ChannelRateOne.objects.order_by('-create_time')
-#     authentication_classes = (JWTAuthentication,)
-#     permission_classes = [BaseAuthPermission, ]
-#     throttle_classes = [VisitThrottle]
-#     serializer_class = ChannelRateOneSerializer
-#     filter_backends = (DjangoFilterBackend, SearchFilter, OrderingFilter,)
-#     search_fields = ('channel_type_name',)
-#     filter_fields = ('channel_type_name',)
-#     ordering_fields = ('update_time', 'create_time',)
-#     pagination_class = Pagination
-
-
-# class ChannelRateTwoViewset(ModelViewSet):
-#     '''
-#     管理渠道费率2
-#     '''
-#     queryset = ChannelRateTwo.objects.order_by('-create_time')
-#     authentication_classes = (JWTAuthentication,)
-#     permission_classes = [BaseAuthPermission, ]
-#     throttle_classes = [VisitThrottle]
-#     serializer_class = ChannelRateTwoSerializer
-#     filter_backends = (DjangoFilterBackend, SearchFilter, OrderingFilter,)
-#     search_fields = ('channel_type_name',)
-#     filter_fields = ('channel_type_name',)
-#     ordering_fields = ('update_time', 'create_time',)
-#     pagination_class = Pagination
 class ManyInsurancePolicyViewset(mixins.ListModelMixin, GenericViewSet):
     '''
         保单管理  渠道结算金额查询
@@ -265,7 +243,7 @@ class InsurancePolicyViewset(ModelViewSet):
     permission_classes = [BaseAuthPermission, ]
     throttle_classes = [VisitThrottle]
     serializer_class = InsurancePolicySerializer
-    filter_backends = (DjangoFilterBackend, SearchFilter, OrderingFilter, ) # InsurancePolicyDateFilterBackend
+    filter_backends = (DjangoFilterBackend, SearchFilter, OrderingFilter,)  # InsurancePolicyDateFilterBackend
     search_fields = ('$jiaoqiang_insure_no', '$nature_of_use', '$chanel_rate_id__chanel', '$settlement_status',
                      '$business_source', '$salesman')
     filter_fields = ('jiaoqiang_insure_no', 'nature_of_use', 'chanel_rate_id__chanel', 'settlement_status',
@@ -276,78 +254,84 @@ class InsurancePolicyViewset(ModelViewSet):
     @action(detail=False, methods=['post', 'option'], permission_classes=[AllowAllPermission])
     def upload_excel(self, request):
         # 获取文件
+        try:
+            file_i = request.FILES.items()
 
-        file_i = request.FILES.items()
+            json_data = {"message": "ok", "errorCode": 0, "data": {}}
+            # 这里面filename是用户上传的文件的key upfile是用户上传的文件名
+            upload_file_list = []
+            upload_host_url_list = []
+            for key_name, up_file in file_i:
+                print(key_name, up_file.name, up_file.size, up_file.read)
 
-        json_data = {"message": "ok", "errorCode": 0, "data": {}}
-        # 这里面filename是用户上传的文件的key upfile是用户上传的文件名
-        upload_file_list = []
-        upload_host_url_list = []
-        for key_name, up_file in file_i:
-            print(key_name, up_file.name, up_file.size, up_file.read)
+                file_name = up_file.name
+                file_size = up_file.size
+                check_file = file_name.split('.')[-1]
+                new_file_name = 'upload_file' # str(uuid.uuid1())
+                if check_file.lower() not in ['xlsx', 'xls']:
+                    json_data['message'] = file_name + '不是规定的类型(%s)！' % '/'.join(settings.FILE_CHECK)
+                    json_data['errorCode'] = 2
+                    return Response(json_data)
+                if file_size > settings.FILE_SIZE:
+                    json_data['message'] = file_name + '文件超过64mb，无法上传！'
+                    json_data['errorCode'] = 2
+                    return Response(json_data)
+                # 获取存储的文件名
+                save_file_name = new_file_name + '.' + check_file
+                # 获取当前文件的绝对路径
+                base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                upfile_base_dir = os.path.join(base_path, 'upload_file')
+                is_have = os.path.exists(upfile_base_dir)
+                if is_have:
+                    save_path = os.path.join(upfile_base_dir, save_file_name)
+                else:
+                    os.makedirs(upfile_base_dir)
+                    save_path = os.path.join(upfile_base_dir, save_file_name)
+                with open(save_path, 'wb') as u_file:
+                    for part in up_file.chunks():
+                        u_file.write(part)
+            # 文件路径
+            print(save_path)
+            host_file_url = 'http://' + settings.SERVER_NAME + '/upload_file/' + save_file_name
 
-            file_name = up_file.name
-            file_size = up_file.size
-            check_file = file_name.split('.')[-1]
-            new_file_name = str(uuid.uuid1())
-            if check_file.lower() not in ['xlsx', 'xls']:
-                json_data['message'] = file_name + '不是规定的类型(%s)！' % '/'.join(settings.FILE_CHECK)
-                json_data['errorCode'] = 2
-                return Response(json_data)
-            if file_size > settings.FILE_SIZE:
-                json_data['message'] = file_name + '文件超过64mb，无法上传！'
-                json_data['errorCode'] = 2
-                return Response(json_data)
-            # 获取存储的文件名
-            save_file_name = new_file_name + '.' + check_file
-            # 获取当前文件的绝对路径
-            base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            upfile_base_dir = os.path.join(base_path, 'upload_file')
-            is_have = os.path.exists(upfile_base_dir)
-            if is_have:
-                save_path = os.path.join(upfile_base_dir, save_file_name)
-            else:
-                os.makedirs(upfile_base_dir)
-                save_path = os.path.join(upfile_base_dir, save_file_name)
-            with open(save_path, 'wb') as u_file:
-                for part in up_file.chunks():
-                    u_file.write(part)
-        # 文件路径
-        print(save_path)
-        host_file_url = 'http://' + settings.SERVER_NAME + '/upload_file/' + save_file_name
+            json_data['data'] = host_file_url
 
-        json_data['data'] = host_file_url
+            import pandas as pd
 
-        import pandas as pd
+            df = pd.read_excel(save_path, header=None, dtype=object)
 
-        df = pd.read_excel(save_path, header=None, dtype=object)
+            print("行索引：{}".format(list(df.index)))
+            row_index = list(df.index)
+            print("列索引：{}".format(list(df.columns)))
+            # column_index = list(df.columns)
 
-        print("行索引：{}".format(list(df.index)))
-        row_index = list(df.index)
-        print("列索引：{}".format(list(df.columns)))
-        # column_index = list(df.columns)
+            headers = None
 
-        headers = None
+            id_arr = []
+            print('row_index_length', len(row_index))
+            for i in row_index:
+                if i == 0:
+                    headers = df.iloc[i]
+                else:
+                    insurance_policy = get_model_from_json(InsurancePolicy(), headers, df.iloc[i])
+                    insurance_policy.save()
+                    id_arr.append(insurance_policy.pk)
 
-        id_arr = []
-        for i in row_index:
-            if i == 0:
-                headers = df.iloc[i]
-            else:
-                insurance_policy = get_model_from_json(InsurancePolicy(), headers, df.iloc[i])
-                insurance_policy.save()
-                id_arr.append(insurance_policy.pk)
-
-        match_insurance_chanel()
-        queryset = InsurancePolicy.objects.filter(id__in=id_arr)
-        serializer = InsurancePolicySerializer(queryset, many=True)
-        return Response(serializer.data)
+            print('id_arr_length', len(row_index))
+            match_insurance_chanel()
+            queryset = InsurancePolicy.objects.filter(id__in=id_arr)
+            serializer = InsurancePolicySerializer(queryset, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            traceback.print_exc()
+            return JsonResponse({"message": "出现了无法预料的view视图错误：%s" % e.__str__(), "errorCode": 1, "data": {}})
 
     @action(detail=False, methods=['get'], permission_classes=[AllowAllPermission])
     def get_insurance_model(self, request):
         pass
 
-        arr_fields = InsurancePolicy()._meta.fields
+        model = self.get_serializer_class().Meta.model
+        arr_fields = model()._meta.fields
         data = {}
         for i in arr_fields:
             # print('字段类型:', type(i).__name__)

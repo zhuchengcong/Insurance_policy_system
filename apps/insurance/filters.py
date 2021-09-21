@@ -32,12 +32,16 @@ class InsurancePolicyDateFilterBackend(BaseFilterBackend):
         # print(endTime)
         # print(InsruanceStartDate)
         # print(InsruanceEndDate)
-        return queryset.filter(deleted=None, generation_date__gte=startTime, generation_date__lte=endTime,
-                               jiaoqiang_insurance_start_date__gte=InsruanceStartDate,
-                               jiaoqiang_insurance_start_date__lte=InsruanceEndDate,
-                               commercial_insurance_start_date__gte=InsruanceStartDate,
-                               commercial_insurance_start_date__lte=InsruanceEndDate
-                               )
+        if request.query_params.get('InsruanceStartDate') is not None and request.query_params.get(
+                'InsruanceEndDate') is not None:
+            return queryset.filter(deleted=None, generation_date__gte=startTime, generation_date__lte=endTime,
+                                   jiaoqiang_insurance_start_date__gte=InsruanceStartDate,
+                                   jiaoqiang_insurance_start_date__lte=InsruanceEndDate,
+                                   commercial_insurance_start_date__gte=InsruanceStartDate,
+                                   commercial_insurance_start_date__lte=InsruanceEndDate,
+                                   )
+        else:
+            return queryset.filter(deleted=None, generation_date__gte=startTime, generation_date__lte=endTime, )
 
     def get_schema_fields(self, view):
         assert coreapi is not None, 'coreapi must be installed to use `get_schema_fields()`'
