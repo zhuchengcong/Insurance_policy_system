@@ -19,6 +19,14 @@ class InsurancePolicyDateFilterBackend(BaseFilterBackend):
         InsruanceStartDate = '2000-01-01 00:00:00'
         InsruanceEndDate = '2099-01-01 00:00:00'
 
+        is_no_chanel = None
+        if request.query_params.get('is_no_chanel') is not None:
+            is_no_chanel = request.query_params.get('is_no_chanel')
+        if is_no_chanel is not None:
+            print(is_no_chanel == 'true')
+            if is_no_chanel == 'true':
+                queryset = queryset.filter(chanel_rate_id=None)
+
         if request.query_params.get('startTime') is not None:
             startTime = request.query_params.get('startTime')
         if request.query_params.get('endTime') is not None:
@@ -46,7 +54,10 @@ class InsurancePolicyDateFilterBackend(BaseFilterBackend):
                                            commercial_insurance_start_date__gte=InsruanceStartDate,
                                            commercial_insurance_start_date__lte=InsruanceEndDate)
                                    ) | Q(jiaoqiang_insurance_start_date=None)
-                                   )
+                                   ).exclude(
+                jiaoqiang_insurance_start_date__gte=InsruanceEndDate,
+                commercial_insurance_start_date__gte=InsruanceEndDate
+            )
         else:
             return queryset.filter(deleted=None, generation_date__gte=startTime, generation_date__lte=endTime, )
 
