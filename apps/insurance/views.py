@@ -80,7 +80,7 @@ def match_insurance_chanel():
 
 
 # 传入的 headers column 均为 pandas.Series对象
-def get_model_from_json(model_instance, headers, column):
+def get_model_from_pandas(model_instance, headers, column):
     row_index = list(headers.index)
     # print('row_index', row_index)
     arr_fields = model_instance._meta.fields
@@ -104,6 +104,41 @@ def get_model_from_json(model_instance, headers, column):
                     headers.drop(index)
         except KeyError as e:
             traceback.print_exc()
+            pass
+            # if e.__str__() == '\'id\'':
+            #     # 新增时没有id
+            #     pass
+            # else:
+            #     import traceback
+            #     traceback.print_exc()    # 打印到控制台
+            #     traceback.format_exc()   # 返回str
+            #     # 这里需要写入错误日志
+    return model_instance
+
+
+def get_model_from_json(model_instance, json_info):
+    arr_fields = model_instance._meta.fields
+    for i in arr_fields:
+        try:
+            # print('字段类型:', type(i).__name__)
+            # print(i.name, json_info[i.name])
+
+            if hasattr(model_instance, i.name):
+                # 时间戳转换成datetime
+                if type(i).__name__ == 'DateTimeField':
+                    # print('转换成日期') 判断是否是日期类型，是就不转换
+                    # print(type(json_info[i.name]))
+                    # print(isinstance(json_info[i.name], datetime.datetime))
+                    if isinstance(json_info[i.name], datetime.datetime):
+                        date = json_info[i.name]
+                        # 为本地时间增加时区信息
+                        date = make_aware(date)
+                    else:
+                        date = json_info[i.name]
+                    setattr(model_instance, i.name, date)
+                else:
+                    setattr(model_instance, i.name, json_info[i.name])
+        except KeyError as e:
             pass
             # if e.__str__() == '\'id\'':
             #     # 新增时没有id
@@ -252,6 +287,38 @@ class InsurancePolicyViewset(ModelViewSet):
     pagination_class = Pagination
 
     @action(detail=False, methods=['post', 'option'], permission_classes=[AllowAllPermission])
+    def upload_json(self, request):
+        try:
+            print('request.data')
+            print(request.data)
+            insraunces = request.data['insurance_arr']
+            auto_download_date = request.data['date']
+            succes = 0
+            chongfu = 0
+            for i in insraunces:
+                # 去掉id,防止已有的保单被修改
+                if 'id' in i:
+                    del i['id']
+
+                # 跳过重复的保单
+                q = InsurancePolicy.objects.filter(Q(commercial_insurance_no=i['commercial_insurance_no']) |
+                                                   Q(jiaoqiang_insurance_no=i['jiaoqiang_insurance_no']))
+                if len(q) > 0:
+                    chongfu += 1
+                else:
+                    insurance_policy = get_model_from_json(InsurancePolicy(), i)
+                    insurance_policy.auto_download_date = auto_download_date
+                    insurance_policy.save()
+                    succes += 1
+            shibai = len(insraunces) - succes - chongfu
+            json_data = {"message": "ok", "errorCode": 0, "data": '成功数量：' + str(succes) + ' 重复数量：' + str(chongfu)
+                                                                  + ' 失败数量：' + str(shibai)}
+            return Response(json_data)
+        except Exception as e:
+            traceback.print_exc()
+            return Response({"message": "出现了无法预料的view视图错误：%s" % e.__str__(), "errorCode": 1, "data": {}})
+
+    @action(detail=False, methods=['post', 'option'], permission_classes=[AllowAllPermission])
     def upload_excel(self, request):
         # 获取文件
         try:
@@ -267,7 +334,7 @@ class InsurancePolicyViewset(ModelViewSet):
                 file_name = up_file.name
                 file_size = up_file.size
                 check_file = file_name.split('.')[-1]
-                new_file_name = 'upload_file' # str(uuid.uuid1())
+                new_file_name = 'upload_file'  # str(uuid.uuid1())
                 if check_file.lower() not in ['xlsx', 'xls']:
                     json_data['message'] = file_name + '不是规定的类型(%s)！' % '/'.join(settings.FILE_CHECK)
                     json_data['errorCode'] = 2
@@ -313,7 +380,7 @@ class InsurancePolicyViewset(ModelViewSet):
                 if i == 0:
                     headers = df.iloc[i]
                 else:
-                    insurance_policy = get_model_from_json(InsurancePolicy(), headers, df.iloc[i])
+                    insurance_policy = get_model_from_pandas(InsurancePolicy(), headers, df.iloc[i])
                     insurance_policy.save()
                     id_arr.append(insurance_policy.pk)
 
@@ -324,7 +391,7 @@ class InsurancePolicyViewset(ModelViewSet):
             return Response(serializer.data)
         except Exception as e:
             traceback.print_exc()
-            return JsonResponse({"message": "出现了无法预料的view视图错误：%s" % e.__str__(), "errorCode": 1, "data": {}})
+            return Response({"message": "出现了无法预料的view视图错误：%s" % e.__str__(), "errorCode": 1, "data": {}})
 
     @action(detail=False, methods=['get'], permission_classes=[AllowAllPermission])
     def get_insurance_model(self, request):

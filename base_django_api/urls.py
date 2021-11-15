@@ -1,5 +1,7 @@
 from base.views import UploadFile, TestView, BeginCelery, ConfDictViewset, UploadLocalFile, test_fuc
 
+from insurance.other_views import download_insurance_policy
+
 from user.views import LoginView, UserViewset, UserInfo, AuthViewset, WeChatUpdateUserViewset, WeChatMiniLoginView, \
     WeChatAppLoginView, MemberViewset, MobileLoginView, MobileCodeView, UserGroupViewset
 from django.contrib import admin
@@ -73,6 +75,7 @@ urlpatterns = [
     path('userinfo/', UserInfo.as_view(), name='个人信息'),
     path('celery/', BeginCelery.as_view(), name='celery测试'),
     path('test_fuc/', test_fuc, name='celery测试'),
+    path('downloadinsurance/', download_insurance_policy.as_view(), name='下载保单'),
 ]
 
 if settings.DEBUG:

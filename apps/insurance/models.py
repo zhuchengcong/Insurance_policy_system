@@ -144,8 +144,8 @@ class InsurancePolicy(SoftDeleteModel, BaseModel):
     note = models.CharField(max_length=255, verbose_name='备注', blank=True, null=True)
     nature_of_use = models.CharField(max_length=255, verbose_name='使用性质', blank=True, null=True)
     generation_date = models.DateTimeField(verbose_name='保单生成日期', blank=True, null=True)
-    jiaoqiang_insure_no = models.CharField(max_length=255, verbose_name='交强投保单号', blank=True, null=True, unique=True)
-    commercial_insure_no = models.CharField(max_length=255, verbose_name='商业投保单号', blank=True, null=True, unique=True)
+    jiaoqiang_insure_no = models.CharField(max_length=255, verbose_name='交强投保单号', blank=True, null=True)
+    commercial_insure_no = models.CharField(max_length=255, verbose_name='商业投保单号', blank=True, null=True)
     jiaoqiang_insurance_start_date = models.DateTimeField(max_length=255, verbose_name='交强起保日期', blank=True, null=True)
     jiaoqiang_insurance_end_date = models.DateTimeField(max_length=255, verbose_name='交强终止日期', blank=True, null=True)
     commercial_insurance_start_date = models.DateTimeField(max_length=255, verbose_name='商业险起保日期', blank=True,
@@ -190,6 +190,9 @@ class InsurancePolicy(SoftDeleteModel, BaseModel):
     chanel_rate_id = models.ForeignKey(ChannelRate, on_delete=models.PROTECT, verbose_name='对应渠道id',
                                        blank=True,
                                        null=True)
+
+    # 自动下载日期
+    auto_download_date = models.DateField(verbose_name='自动下载日期', blank=True, null=True, )
 
     @property
     def total_premium_(self):
