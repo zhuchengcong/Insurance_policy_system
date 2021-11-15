@@ -282,7 +282,7 @@ class InsurancePolicyViewset(ModelViewSet):
     search_fields = ('$jiaoqiang_insure_no', '$nature_of_use', '$chanel_rate_id__chanel', '$settlement_status',
                      '$business_source', '$salesman')
     filter_fields = ('jiaoqiang_insure_no', 'nature_of_use', 'chanel_rate_id__chanel', 'settlement_status',
-                     'business_source',)
+                     'business_source', 'auto_download_date')
     ordering_fields = ('update_time', 'create_time',)
     pagination_class = Pagination
 
