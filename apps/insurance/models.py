@@ -216,3 +216,15 @@ class ChannelMatch(SoftDeleteModel, BaseModel):
         db_table = 'channel_match'
         verbose_name = '渠道匹配表'
         verbose_name_plural = verbose_name
+
+
+# 自动下载 记录
+class AutoDownloadRecord(BaseModel):
+    auto_download_date = models.DateField(verbose_name='自动下载日期', blank=True, null=True, unique=True)
+    log = models.CharField(max_length=255, verbose_name='日志', blank=True, null=True)
+    download_count = models.IntegerField(verbose_name='下载次数', default=0, blank=True, null=True)
+
+    class Meta:
+        db_table = 'auto_download_record'
+        verbose_name = '自动下载记录表'
+        verbose_name_plural = verbose_name

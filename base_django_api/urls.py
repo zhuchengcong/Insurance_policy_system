@@ -47,8 +47,7 @@ router.register(r'UserGroup', UserGroupViewset, basename='用户组管理')
 # 保单相关接口
 from insurance.views import SettlementsViewset, InsurancePolicyViewset, \
     HandlingFeeViewset, FeeFieldViewset, ChannelRateViewset, ChannelEffectiveTimeViewset, ManyInsurancePolicyViewset, \
-    RemitViewset, ChannelMatchViewset
-
+    RemitViewset, ChannelMatchViewset, AutoDownloadRecordViewset
 
 router.register(r'ChannelEffectiveTime', ChannelEffectiveTimeViewset, basename='渠道生效时间管理')
 router.register(r'ChannelRate', ChannelRateViewset, basename='渠道管理')
@@ -59,6 +58,7 @@ router.register(r'Remit', RemitViewset, basename='结算单打款明细管理')
 router.register(r'InsurancePolicy', InsurancePolicyViewset, basename='保单管理')
 router.register(r'InsurancePolicySettlements', ManyInsurancePolicyViewset, basename='保单管理_结算查询')
 router.register(r'HandlingFee', HandlingFeeViewset, basename='手续费管理')
+router.register(r'AutoDownloadRecord', AutoDownloadRecordViewset, basename='自动下载日志')
 
 urlpatterns = [
     url(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),

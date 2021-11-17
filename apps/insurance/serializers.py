@@ -2,7 +2,7 @@
 from rest_framework import serializers
 
 from insurance.models import InsurancePolicy, Settlements, HandlingFee, FeeField, ChannelRate, ChannelEffectiveTime, \
-    Remit, ChannelMatch
+    Remit, ChannelMatch, AutoDownloadRecord
 
 
 # class ChannelRateOneSerializer(serializers.ModelSerializer):
@@ -107,4 +107,10 @@ class HandlingFeeSerializer(serializers.ModelSerializer):
 class ChannelMatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChannelMatch
+        fields = '__all__'
+
+
+class AutoDownloadRecordSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AutoDownloadRecord
         fields = '__all__'

@@ -311,8 +311,18 @@ class InsurancePolicyViewset(ModelViewSet):
                     insurance_policy.save()
                     succes += 1
             shibai = len(insraunces) - succes - chongfu
-            json_data = {"message": "ok", "errorCode": 0, "data": '成功数量：' + str(succes) + ' 重复数量：' + str(chongfu)
-                                                                  + ' 失败数量：' + str(shibai)}
+            return_str = '成功数量：' + str(succes) + ' 重复数量：' + str(chongfu) + ' 失败数量：' + str(shibai)
+            json_data = {"message": "ok", "errorCode": 0, "data": return_str}
+            query = AutoDownloadRecord.objects.filter(auto_download_date=auto_download_date)
+            if len(query) <= 0:
+                AutoDownloadRecord.objects.create(auto_download_date=auto_download_date, download_count=1,
+                                                  log=return_str)
+            else:
+                for item in query:
+                    item.auto_download_date = auto_download_date
+                    item.download_count += 1
+                    item.log = return_str
+                    item.save()
             return Response(json_data)
         except Exception as e:
             traceback.print_exc()
@@ -591,3 +601,20 @@ class ChannelMatchViewset(ModelViewSet):
     def match_insurance(self, request):
         data = match_insurance_chanel()
         return Response(data)
+
+
+class AutoDownloadRecordViewset(ModelViewSet):
+    '''
+    自动下载记录
+    match_insurance: 按照规则匹配所有未匹配渠道的保单
+    '''
+    queryset = AutoDownloadRecord.objects.order_by('-create_time')
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = [BaseAuthPermission, ]
+    throttle_classes = [VisitThrottle]
+    serializer_class = AutoDownloadRecordSerializer
+    filter_backends = (DjangoFilterBackend, SearchFilter, OrderingFilter,)
+    search_fields = ('auto_download_date',)
+    filter_fields = ('id', 'auto_download_date')
+    ordering_fields = ('update_time', 'create_time',)
+    pagination_class = Pagination
